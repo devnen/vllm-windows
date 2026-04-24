@@ -20,13 +20,12 @@ MODEL_PATH = r"G:\_models\Qwen3.6-27B-AWQ-BF16-INT4"
 SERVED_NAME = "qwen3.6-27b"
 HOST = "0.0.0.0"
 PORT = 5000
-CTX = 8000
+CTX = 48000  # Max stable: KV cache at mem_util=0.92 fits ~49,600 tokens.
 TP = 1
-PP = 2  # Pipeline parallel across 2 GPUs — avoids Gloo allreduce crash.
-GPU_MEM_UTIL = 0.85
-# Diagnostic toggles: turn off exotic features until TP=2 baseline works.
-ENABLE_SPEC = False
-ENFORCE_EAGER = True
+PP = 2  # Pipeline parallel: fastest working config on Windows (~21 tok/s baseline).
+GPU_MEM_UTIL = 0.92
+ENABLE_SPEC = False  # Spec decode requires PP=1; not compatible with our PP=2 setup.
+ENFORCE_EAGER = False  # Re-enable cudagraphs for decode speedup.
 
 
 def port_in_use(host: str, port: int) -> bool:
