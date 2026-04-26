@@ -41,6 +41,30 @@ when `os.name == "nt"`. Applied in:
 - Carries over from prior session; no Windows-specific logic beyond
   `AsyncIntermediateTensors.wait_for_comm`.
 
+### `reasoning/qwen3_reasoning_parser.py` (PR #35687 mirror)
+
+Qwen3.5/3.6 models sometimes emit `<tool_call>` inside a `<think>` block
+without closing `</think>` first. The 0.19.0 wheel's parser swallows the
+entire output as reasoning, the `qwen3_coder` tool parser sees empty
+content, and the tool call is silently dropped.
+
+This file is a verbatim mirror of vLLM main's parser (PR #35687):
+adds `_tool_call_token_id` init, three new override methods
+(`is_reasoning_end`, `is_reasoning_end_streaming`, `extract_content_ids`),
+and an implicit-end branch in both `extract_reasoning` and
+`extract_reasoning_streaming`. Pair-checks `<tool_call>` vs
+`</tool_call>` so chat-template examples in prompts don't false-fire.
+
+### `entrypoints/openai/models/serving.py` (opt-in wildcard model name)
+
+Adds `VLLM_ACCEPT_ANY_MODEL_NAME` env var (default off). When set to
+`1`/`true`/`yes`/`on`, `OpenAIModelRegistry.is_base_model` returns True
+for any model name, so the OpenAI server resolves any client-provided
+`"model"` field to the first served base model. Useful for single-tenant
+single-model setups where keeping client configs in sync with
+`--served-model-name` is friction. LoRA path is unaffected (`_check_model`
+checks the lora dict before falling through to `is_base_model`).
+
 ## Applying to a fresh venv
 
 After a clean install of vLLM 0.19, copy these files over the installed
@@ -51,6 +75,8 @@ cp windows_patches/parallel_state.py              venv/Lib/site-packages/vllm/di
 cp windows_patches/cuda_communicator.py           venv/Lib/site-packages/vllm/distributed/device_communicators/cuda_communicator.py
 cp windows_patches/base_device_communicator.py    venv/Lib/site-packages/vllm/distributed/device_communicators/base_device_communicator.py
 cp windows_patches/gpu_worker.py                  venv/Lib/site-packages/vllm/v1/worker/gpu_worker.py
+cp windows_patches/qwen3_reasoning_parser.py      venv/Lib/site-packages/vllm/reasoning/qwen3_reasoning_parser.py
+cp windows_patches/serving_models.py              venv/Lib/site-packages/vllm/entrypoints/openai/models/serving.py
 ```
 
 ## Verified configurations (2x RTX 3090, 250W limit, Qwen3.6-27B-AWQ)
