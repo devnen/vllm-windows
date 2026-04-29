@@ -1,0 +1,132 @@
+name: Release patched wheel
+
+# Two ways to fire this:
+#   1. Push a tag named v0.19.0-devnen.<N>. Uses the URL set as
+#      UPSTREAM_WHEEL_URL repo variable (or the workflow_dispatch input).
+#   2. Run from the Actions UI ("Run workflow") with an explicit
+#      upstream wheel URL.
+#
+# The job:
+#   - Downloads the upstream SystemPanic wheel.
+#   - Runs windows_patches/repackage_wheel.py to apply the 3 patches and
+#     bump the version to 0.19.0+<tag>.
+#   - Computes SHA256SUMS.txt.
+#   - Creates a GitHub Release on the pushed tag with the wheel + sums
+#     attached. Notes are read from dist/RELEASE_NOTES.md when present.
+
+on:
+  push:
+    tags:
+      - 'v0.*-devnen.*'
+  workflow_dispatch:
+    inputs:
+      upstream_wheel_url:
+        description: 'URL to the upstream SystemPanic vllm wheel (.whl)'
+        required: false
+        type: string
+      tag:
+        description: 'Local-version tag suffix (e.g. devnen.2). Used for the wheel filename. Required for workflow_dispatch.'
+        required: false
+        type: string
+      release_tag:
+        description: 'Git tag to create/release against (e.g. v0.19.0-devnen.2). Required for workflow_dispatch.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Resolve inputs (tag-based or dispatch)
+        id: vars
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REL_TAG="${GITHUB_REF#refs/tags/}"
+            # v0.19.0-devnen.1  ->  devnen.1
+            LOCAL_TAG="$(echo "$REL_TAG" | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+-//')"
+            URL="${{ vars.UPSTREAM_WHEEL_URL }}"
+          else
+            REL_TAG="${{ inputs.release_tag }}"
+            LOCAL_TAG="${{ inputs.tag }}"
+            URL="${{ inputs.upstream_wheel_url }}"
+            if [ -z "$URL" ]; then URL="${{ vars.UPSTREAM_WHEEL_URL }}"; fi
+          fi
+          if [ -z "$URL" ]; then
+            echo "::error::No upstream wheel URL. Set the UPSTREAM_WHEEL_URL repo variable or pass upstream_wheel_url to workflow_dispatch."
+            exit 1
+          fi
+          if [ -z "$LOCAL_TAG" ] || [ -z "$REL_TAG" ]; then
+            echo "::error::Could not derive LOCAL_TAG / REL_TAG from inputs."
+            exit 1
+          fi
+          echo "release_tag=$REL_TAG"  >> "$GITHUB_OUTPUT"
+          echo "local_tag=$LOCAL_TAG"  >> "$GITHUB_OUTPUT"
+          echo "upstream_url=$URL"     >> "$GITHUB_OUTPUT"
+
+      - name: Download upstream wheel
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          echo "Downloading: ${{ steps.vars.outputs.upstream_url }}"
+          curl -sSL "${{ steps.vars.outputs.upstream_url }}" -o upstream.whl
+          ls -lh upstream.whl
+
+      - name: Repackage with devnen patches
+        run: |
+          python windows_patches/repackage_wheel.py \
+            --in upstream.whl \
+            --tag '${{ steps.vars.outputs.local_tag }}' \
+            --out dist
+
+      - name: Generate SHA256SUMS.txt
+        run: |
+          cd dist
+          python -c "
+          import hashlib, pathlib
+          for p in sorted(pathlib.Path('.').glob('*.whl')):
+              print(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}')
+          " > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Resolve release notes
+        id: notes
+        run: |
+          if [ -f dist/RELEASE_NOTES.md ]; then
+            echo "path=dist/RELEASE_NOTES.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "Patched native-Windows vLLM wheel. See repo README for what's in the patches." > /tmp/notes.md
+            echo "path=/tmp/notes.md" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create / update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REL='${{ steps.vars.outputs.release_tag }}'
+          # If triggered by workflow_dispatch on a tag that doesn't exist, create it.
+          if ! git rev-parse "refs/tags/$REL" >/dev/null 2>&1; then
+            git tag "$REL"
+            git push origin "$REL" || true
+          fi
+          if gh release view "$REL" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload  "$REL" dist/*.whl dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit    "$REL" --notes-file '${{ steps.notes.outputs.path }}' --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create  "$REL" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "vLLM 0.19.0+${{ steps.vars.outputs.local_tag }} — patched native-Windows build" \
+              --notes-file '${{ steps.notes.outputs.path }}' \
+              dist/*.whl dist/SHA256SUMS.txt
+          fi
