@@ -1,0 +1,292 @@
+windows:
+  shared_defaults:
+    model_path: '${MODEL_DIR}'
+    served_model_name: qwen3.6-27b-autoround
+    quantization: auto-round
+    kv_cache_dtype: fp8_e4m3
+    attention_backend: TRITON_ATTN
+    vllm_version: 0.19.0 SystemPanic wheel
+    triton_backend: true
+    max_num_seqs: 1
+    max_num_batched_tokens: 4128
+    block_size: 32
+    enable_prefix_caching: true
+    enable_chunked_prefill: true
+    enable_auto_tool_choice: true
+    tool_call_parser: qwen3_coder
+    reasoning_parser: qwen3
+    trust_remote_code: true
+    no_use_tqdm_on_load: true
+    host: 0.0.0.0
+    vision_disabled: true
+    power_cap_w: 350
+    bench_prompt_tokens: 24421
+    bench_max_tokens: 200
+
+  configs:
+    - id: speed
+      tagline: Speed king — peak decode
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_speed.bat'
+      py:  '${SNAPSHOTS_DIR}\start_speed.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.948
+      mtp_n: 6
+      ctx: 90000
+      port: 5001
+      decode_tps: 64.5
+      prefill_tps_cold: 965
+      notes: |
+        Peak decode config. MTP n=6 at ctx=90k is the sweet spot.
+        Picked from sweep — see compatibility matrix and detail screen for full sweep.
+
+    - id: ctx127k
+      tagline: Max ctx single-GPU
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_127k.bat'
+      py:  '${SNAPSHOTS_DIR}\start_127k.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.948
+      mtp_n: 3
+      ctx: 127000
+      port: 5001
+      decode_tps: 53.4
+      prefill_tps_cold: 965
+      notes: Largest single-GPU context. Trades decode speed for headroom.
+
+    - id: mtp4
+      tagline: Mid-balance ctx vs speed
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_mtp4.bat'
+      py:  '${SNAPSHOTS_DIR}\start_mtp4.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.948
+      mtp_n: 4
+      ctx: 120000
+      port: 5001
+      decode_tps: 58.3
+      prefill_tps_cold: 965
+      notes: Compromise between speed and ctx headroom.
+
+    - id: pp2_160k
+      tagline: Both-GPU big-ctx, no spec-decode
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_pp2_160k.bat'
+      py:  '${SNAPSHOTS_DIR}\start_pp2.py'
+      gpu: GPU0+1
+      tp: 1
+      pp: 2
+      mem_util: 0.92
+      mtp_n: null
+      ctx: 160000
+      port: 5002
+      decode_tps: 40.3
+      prefill_tps_cold: 949
+      notes: |
+        PP=2 across both GPUs. No spec-decode (Qwen3NextMTP doesn't inherit SupportsPP).
+        Best when you need >127k ctx.
+
+    - id: gpu0_50k
+      tagline: GPU0 — needs ≥22GiB free
+      tier: active
+      status: conditional
+      bat: '${SNAPSHOTS_DIR}\start_gpu0_50k.bat'
+      py:  '${SNAPSHOTS_DIR}\start_gpu0_50k.py'
+      gpu: GPU0
+      tp: 1
+      pp: 1
+      mem_util: 0.92
+      mtp_n: 6
+      ctx: 50000
+      port: 5001
+      decode_tps: 56.9
+      decode_tps_short: 75.1
+      prefill_tps_cold: null
+      notes: |
+        Runs on GPU0 — only viable when GPU0 has ≥22GiB free.
+        Decode 56.9 tok/s on 24k prompt; 75.1 on 9k prompt.
+
+    - id: ctx121k
+      tagline: Legacy 250W max-ctx
+      tier: legacy
+      status: superseded
+      bat: '${SNAPSHOTS_DIR}\start_121k.bat'
+      py:  '${SNAPSHOTS_DIR}\start_121k.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.94
+      mtp_n: 3
+      ctx: 121000
+      port: 5001
+      decode_tps: 50.7
+      prefill_tps_cold: 845
+      power_cap_w: 250
+      notes: Legacy 250W cap config. Superseded by ctx127k at 350W.
+
+    - id: ctx120k
+      tagline: Legacy ctx ladder
+      tier: legacy
+      status: superseded
+      bat: '${SNAPSHOTS_DIR}\start_120k.bat'
+      py:  '${SNAPSHOTS_DIR}\start_120k.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.94
+      mtp_n: 3
+      ctx: 120000
+      port: 5001
+      decode_tps: null
+      prefill_tps_cold: null
+      notes: Old ctx ladder rung.
+
+    - id: ctx100k
+      tagline: Legacy ctx ladder
+      tier: legacy
+      status: superseded
+      bat: '${SNAPSHOTS_DIR}\start_100k.bat'
+      py:  '${SNAPSHOTS_DIR}\start_100k.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.94
+      mtp_n: 3
+      ctx: 100000
+      port: 5001
+      decode_tps: null
+      prefill_tps_cold: null
+      notes: Old ctx ladder rung.
+
+    - id: ctx64k
+      tagline: Legacy ctx ladder
+      tier: legacy
+      status: superseded
+      bat: '${SNAPSHOTS_DIR}\start_64k.bat'
+      py:  '${SNAPSHOTS_DIR}\start_64k.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.94
+      mtp_n: 3
+      ctx: 64000
+      port: 5001
+      decode_tps: null
+      prefill_tps_cold: null
+      notes: Old ctx ladder rung.
+
+    - id: baseline72
+      tagline: Original 250W baseline
+      tier: legacy
+      status: superseded
+      bat: '${SNAPSHOTS_DIR}\start_72tps.bat'
+      py:  '${SNAPSHOTS_DIR}\start.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.92
+      mtp_n: 3
+      ctx: 32000
+      port: 5001
+      decode_tps_long: 50
+      decode_tps_short: 72.5
+      power_cap_w: 250
+      notes: Original 250W baseline. ~50 tok/s on 24k prompt; 72.5 on short prompts.
+
+    - id: draft
+      tagline: BLOCKED — no vocab=248320 drafter
+      tier: blocked
+      status: blocked
+      bat: '${SNAPSHOTS_DIR}\start_draft.bat'
+      py:  '${SNAPSHOTS_DIR}\start_draft.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.92
+      draft_model_n: 5
+      ctx: 32000
+      port: 5003
+      decode_tps: null
+      prefill_tps_cold: null
+      notes: |
+        Draft-model speculative decode. BLOCKED — no compatible drafter
+        with vocab_size=248320 exists for Qwen3.6-27B-int4-AutoRound.
+
+    - id: dflash
+      tagline: Luce DFlash GGUF — non-vLLM, experimental
+      tier: active
+      status: experimental
+      bat: 'C:\_projects\luce-dflash\start_dflash.bat'
+      py:  'C:\_projects\luce-dflash\start_dflash.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 1.0
+      ctx: 24832
+      port: 5004
+      decode_tps: 11.6
+      decode_tps_short: 42.0
+      power_cap_w: 350
+      notes: |
+        Standalone C++/CUDA GGUF runtime (Luce-Org/lucebox-hub). Bypasses vLLM
+        entirely. Target: Qwen3.6-27B-Q4_K_M.gguf (unsloth), draft:
+        z-lab/Qwen3.6-27B-DFlash (still under training).
+        DDTree budget=22, KV=TQ3_0 default, FA window=2048, greedy verify only.
+
+        Measured 2026-04-27 on GPU1 @ 350W:
+        - 24383-token service.py summary, n_gen=200: 11.62 tok/s, AL 4.17, 26% accept.
+        - Short prompts (14 tok in, 256 gen): 42 tok/s, AL 8.53, 53% accept.
+        Repo README confirms Qwen3.6 runs ~57% slower than Qwen3.5 because the
+        z-lab Qwen3.6 draft is still training (AL 5.05 vs 8.33).
+
+        vs `start_speed`: ~5.5x SLOWER on the 24k service.py
+        bench (11.6 vs 64.5 tok/s). Don't use for daily long-prompt work yet.
+
+        Required env (already in start_dflash.bat):
+          CUDA_VISIBLE_DEVICES=1
+          DFLASH27B_PREFILL_UBATCH=128   # default 384 OOMs on 24k prompts
+          PYTHONIOENCODING=utf-8         # else stdin tokenizer crashes
+        Built with VS 2022 + CUDA 12.4 (cmake -G Ninja, ml64 ASM compiler).
+        Server reloads weights per request (~10s first-token latency); a
+        daemon binary is on the upstream roadmap.
+
+        Coherence not fully validated: short-prompt bench output started
+        coherent but tail token IDs showed 7561/1510 alternation that may be
+        an early-stage attractor — run the 3-tier coherence battery before
+        trusting any TPS number on prose.
+
+  mtp_sweep:
+    description: MTP n × ctx sweep on speed config (GPU1, mem=0.948, 350W)
+    rows:
+      - { mtp_n: 3, ctx: 121000, decode_tps: 50.7 }
+      - { mtp_n: 3, ctx: 127000, decode_tps: 53.4 }
+      - { mtp_n: 4, ctx: 120000, decode_tps: 58.3 }
+      - { mtp_n: 5, ctx: 110000, decode_tps: 62.8 }
+      - { mtp_n: 6, ctx: 90000,  decode_tps: 64.5, peak: true }
+      - { mtp_n: 6, ctx: 100000, decode_tps: 64.4 }
+      - { mtp_n: 6, ctx: 112000, decode_tps: 60.4 }
+      - { mtp_n: 7, ctx: 90000,  decode_tps: 61.5 }
+      - { mtp_n: 8, ctx: 90000,  decode_tps: 58.0 }
+
+  compatibility_matrix:
+    - { combo: 'TP=1 + MTP',           status: ok,      note: 'Works — production path' }
+    - { combo: 'TP=1 + draft-model',   status: blocked, note: 'No compatible drafter (vocab=248320)' }
+    - { combo: 'PP=2 + MTP',           status: bad,     note: 'Qwen3NextMTP does not inherit SupportsPP' }
+    - { combo: 'PP=2 + ngram',         status: warn,    note: 'Boots, asserts on first request' }
+    - { combo: 'PP=2 + no spec-decode', status: ok,     note: 'pp2_160k path' }
+    - { combo: 'TP=2 (any)',           status: warn,    note: '~7.5 tok/s — unusable' }
+    - { combo: 'Luce DFlash GGUF',     status: warn,    note: 'Works on GPU1 but ~5.5x slower than start_speed on 24k prompts (11.6 vs 64.5 tok/s)' }
+
+
+# Linux section intentionally omitted from this public release.
+# Linux + remote-host support is on the roadmap; see PLAN.md.

@@ -1,180 +1,145 @@
-<!-- markdownlint-disable MD001 MD041 -->
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-dark.png">
-    <img alt="vLLM" src="https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png" width=55%>
-  </picture>
-</p>
+# vllm-windows
 
-<h3 align="center">
-Easy, fast, and cheap LLM serving for everyone
-</h3>
+> Native Windows fork of [vLLM](https://github.com/vllm-project/vllm) — no
+> WSL, no Docker, no conda bootstrap. Prebuilt wheel, portable launcher,
+> validated configs for Qwen3.6-27B on RTX 3090 / 4090. **Everything runs
+> on your machine. No telemetry, no analytics, no phone-home.**
 
-<p align="center">
-| <a href="https://docs.vllm.ai"><b>Documentation</b></a> | <a href="https://blog.vllm.ai/"><b>Blog</b></a> | <a href="https://arxiv.org/abs/2309.06180"><b>Paper</b></a> | <a href="https://x.com/vllm_project"><b>Twitter/X</b></a> | <a href="https://discuss.vllm.ai"><b>User Forum</b></a> | <a href="https://slack.vllm.ai"><b>Developer Slack</b></a> |
-</p>
-
-🔥 We have built a vllm website to help you get started with vllm. Please visit [vllm.ai](https://vllm.ai) to learn more.
-For events, please visit [vllm.ai/events](https://vllm.ai/events) to join us.
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Made for Windows](https://img.shields.io/badge/OS-Windows%2010%2F11-0078d6.svg)](https://www.microsoft.com/windows)
+[![GPU](https://img.shields.io/badge/tested-RTX%203090%20%C3%97%202-76b900.svg)](https://www.nvidia.com/)
 
 ---
 
-## vLLM for Windows
+## Why this exists
 
-vLLM for Windows build & kernels. This repository will be updated when new versions of vLLM are released.
+vLLM is the fastest single-user inference engine on consumer NVIDIA right now.
+Most fast Qwen3.6-27B recipes on r/LocalLLaMA assume Linux + Docker + WSL.
+That's a tax: one community member measured the same 5090 going from
+**85 tok/s in WSL to 160 tok/s in native Ubuntu**. Windows users either
+take the WSL hit or don't run vLLM.
 
-**Don't open a new Issue to request a specific commit build. Wait for a new stable release.**
+This fork is the third option. Same vLLM core, but with the Windows-specific
+patches that make it actually work natively, packaged so the install is:
 
-**Don't open Issues for general vLLM questions or non Windows related problems. Only Windows specific issues.** Any Issue opened that is not Windows specific will be closed automatically.
-
-**Don't request a wheel for your specific environment.** If your environment does not match the released wheel, build your own wheel from source by following the [instructions below](https://github.com/SystemPanic/vllm-windows?tab=readme-ov-file#building-from-source).
-
-### Windows instructions:
-
-#### Installing an existing release wheel:
-
-1. Ensure that you have the correct Python, Torch and CUDA version of the wheel. The Python, Torch and CUDA version of the wheel is specified in the release version.
-2. Download the wheel from the release version of your preference (latest wheel [here](https://github.com/SystemPanic/vllm-windows/releases/latest)).
-3. Install it with ```pip install DOWNLOADED_WHEEL_PATH```
-
-#### Building from source:
-
-A Visual Studio 2019 or newer is required to launch the compiler x64 environment. The installation path is referred in the instructions as VISUAL_STUDIO_INSTALL_PATH.
-
-CUDA path will be found automatically if you have the bin folder in your PATH, or have the CUDA installation path settled on well-known environment vars like CUDA_ROOT, CUDA_HOME or CUDA_PATH.
-
-If none of these are present, make sure to set the environment variable before starting the build:
-set CUDA_ROOT=CUDA_INSTALLATION_PATH
-
-1. Open a Command Line (cmd.exe)
-2. **Clone the vLLM for Windows repository from vllm-for-windows branch (NOT MAIN): ```cd C:\ & git clone --single-branch --branch vllm-for-windows https://github.com/SystemPanic/vllm-windows.git```**
-3. Execute (in cmd) ```VISUAL_STUDIO_INSTALL_PATH\VC\Auxiliary\Build\vcvarsall.bat x64```
-4. Change the working directory to the cloned repository path, for example: ```cd C:\vllm-windows```
-5. Set the following environment variables:
-
-```
-set DISTUTILS_USE_SDK=1
-set VLLM_TARGET_DEVICE=cuda
-#(replace 10 with your desired cpu threads to use in parallel to speed up compilation)
-set MAX_JOBS=10
-
-#Optional variables:
-
-#To include cuDSS (only if you have cuDSS installed)
-set USE_CUDSS=1
-set CUDSS_LIBRARY_PATH=PATH_TO_CUDSS_INSTALL_DIR\lib\12
-set CUDSS_INCLUDE_PATH=PATH_TO_CUDSS_INSTALL_DIR\include
-
-#To include cuSPARSELt (only if you have cuSPARSELt installed)
-set USE_CUSPARSELT=1
-set CUSPARSELT_INCLUDE_PATH=PATH_TO_CUSPARSELT_INSTALL_DIR\include
-set CUSPARSELT_LIBRARY_PATH=PATH_TO_CUSPARSELT_INSTALL_DIR\lib
-
-#To include cuDNN:
-set USE_CUDNN=1
-set CUDNN_LIBRARY_PATH=PATH_TO_CUDNN_INSTALL_DIR\lib\CUDNN_CUDA_VERSION\x64
-set CUDNN_INCLUDE_PATH=PATH_TO_CUDNN_INSTALL_DIR\include\CUDNN_CUDA_VERSION
-
-#Flash Attention v3 build has been disabled inside WSL2 and Windows due to compiler being killed on WSL2, and extremely long compiling times on Windows. Hopper is not available on Windows, so FA3 has no sense anyway. 
-#Build can be forcefully enabled using the following environment var:
-set VLLM_FORCE_FA3_WINDOWS_BUILD=1
-
-```
-6. Build & install:
-```
-#With torch 2.11 cuda 12.6 (change cu126 with your installed CUDA version)
-pip install --pre torch==2.11.0.dev20260216+cu126 torchvision==0.26.0.dev20260216+cu126 torchaudio==2.11.0.dev20260216+cu126 --index-url https://download.pytorch.org/whl/nightly/cu126
-
-#With your already installed torch cuda version (make sure you have torch cuda installed if you use a virtual environment)
-python use_existing_torch.py
-
-pip install -r requirements/build.txt
-pip install -r requirements/windows.txt
-pip install . --no-build-isolation
-
+```text
+1. Download the launcher zip from Releases.
+2. Unzip.
+3. Double-click start.bat.
 ```
 
----
+No pip, no conda, no `curl | bash`. The launcher ships with an embedded
+Python runtime — every dependency is preinstalled inside the zip.
 
-## About
+## What you get
 
-vLLM is a fast and easy-to-use library for LLM inference and serving.
+**On a single RTX 3090 (24 GB) running Qwen3.6-27B Lorbus AutoRound INT4:**
 
-Originally developed in the [Sky Computing Lab](https://sky.cs.berkeley.edu) at UC Berkeley, vLLM has evolved into a community-driven project with contributions from both academia and industry.
+| Snapshot              | Decode tok/s | Context | Notes                                          |
+|-----------------------|--------------|---------|------------------------------------------------|
+| `start_speed`         | **64.5**     | 90k     | Peak decode — MTP n=6 sweet spot for long prompts |
+| `start_127k`          | 53.4         | 127k    | Maximum context on a single GPU                |
+| `start_mtp4`          | 58.3         | 120k    | Mid-balance speed vs context                   |
+| `start_72tps`         | ~72 short    | 32k     | Original short-prompt baseline                 |
+| `start_pp2_160k` (2× GPU) | 43.5     | 160k    | Pipeline-parallel for the largest contexts     |
+| `start_gpu0_50k`      | volatile     | ~9–50k  | Single-GPU users with the display attached     |
 
-vLLM is fast with:
+All numbers measured on a 24 KB / ~24 k-token Python source-summary prompt.
+[Coherence-validated](docs/COHERENCE.md) — TPS without coherence is a lie.
 
-- State-of-the-art serving throughput
-- Efficient management of attention key and value memory with [**PagedAttention**](https://blog.vllm.ai/2023/06/20/vllm.html)
-- Continuous batching of incoming requests
-- Fast model execution with CUDA/HIP graph
-- Quantizations: [GPTQ](https://arxiv.org/abs/2210.17323), [AWQ](https://arxiv.org/abs/2306.00978), [AutoRound](https://arxiv.org/abs/2309.05516), INT4, INT8, and FP8
-- Optimized CUDA kernels, including integration with FlashAttention and FlashInfer
-- Speculative decoding
-- Chunked prefill
+## What's actually in this fork (vs SystemPanic upstream)
 
-vLLM is flexible and easy to use with:
+Three patches against `SystemPanic/vllm-windows` 0.19.0, full diff in
+[`CHANGES_VS_SYSTEMPANIC.md`](CHANGES_VS_SYSTEMPANIC.md):
 
-- Seamless integration with popular Hugging Face models
-- High-throughput serving with various decoding algorithms, including *parallel sampling*, *beam search*, and more
-- Tensor, pipeline, data and expert parallelism support for distributed inference
-- Streaming outputs
-- OpenAI-compatible API server
-- Support for NVIDIA GPUs, AMD CPUs and GPUs, Intel CPUs and GPUs, PowerPC CPUs, Arm CPUs, and TPU. Additionally, support for diverse hardware plugins such as Intel Gaudi, IBM Spyre and Huawei Ascend.
-- Prefix caching support
-- Multi-LoRA support
+1. **CPU-relay for Gloo collectives.** Windows has no real NCCL. Pipeline
+   and tensor parallelism hang on CUDA tensors without staging through
+   pinned CPU buffers. Patches `parallel_state.py`, `cuda_communicator.py`,
+   `base_device_communicator.py`. PP=2 works at 43 tok/s; TP=2 works but
+   is dominated by CPU-relay and isn't worth using.
+2. **Qwen3 reasoning-parser fix** (mirror of upstream PR #35687) so
+   `<tool_call>` doesn't get silently swallowed inside an unclosed
+   `<think>` block.
+3. **Hardwired wildcard model name** — clients no longer need to match
+   `--served-model-name` exactly. The fork is single-tenant single-model
+   by design.
 
-vLLM seamlessly supports most popular open-source models on HuggingFace, including:
+## Install
 
-- Transformer-like LLMs (e.g., Llama)
-- Mixture-of-Expert LLMs (e.g., Mixtral, Deepseek-V2 and V3)
-- Embedding Models (e.g., E5-Mistral)
-- Multi-modal LLMs (e.g., LLaVA)
+**The 60-second path:**
 
-Find the full list of supported models [here](https://docs.vllm.ai/en/latest/models/supported_models.html).
+1. Grab `vllm-windows-launcher-portable-x64.zip` from the latest
+   [Release](../../releases). Extract anywhere (no admin needed).
+2. Either set `VLLM_MODEL_DIR` to your Qwen3.6 weights folder, or drop the
+   model into `models\Qwen3.6-27B-int4-AutoRound\` next to the launcher.
+3. Double-click `start.bat`. The TUI lists every snapshot. Pick one,
+   press Enter, you're serving.
 
-## Getting Started
+Detailed install (including the wheel-only path for users who already have
+their own venv): see [`docs/INSTALL.md`](docs/INSTALL.md).
 
-Install vLLM with `pip` or [from source](https://docs.vllm.ai/en/latest/getting_started/installation/gpu/index.html#build-wheel-from-source):
+## Hardware reality
 
-```bash
-pip install vllm
-```
+This fork was tuned and tested on:
 
-Visit our [documentation](https://docs.vllm.ai/en/latest/) to learn more.
+- Windows 10 Enterprise 22H2
+- 2× NVIDIA RTX 3090 (Ampere, sm_86), no NVLink, PCIe Gen 4
+- Power cap up to 350 W per card
 
-- [Installation](https://docs.vllm.ai/en/latest/getting_started/installation.html)
-- [Quickstart](https://docs.vllm.ai/en/latest/getting_started/quickstart.html)
-- [List of Supported Models](https://docs.vllm.ai/en/latest/models/supported_models.html)
+It **should** work on any Ampere or newer GPU (3090, 4090, 5090, A6000)
+running Windows 10/11. It will not work on Pascal/Turing, Intel Arc, or
+any AMD card. **One card with the display attached** loses 1–3 GiB of
+VRAM to the Windows desktop compositor and another 2–5 GiB to running
+apps — see [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md)
+for the workarounds, and use the `start_gpu0_50k` snapshot when you have
+no display-free GPU available.
+
+If you're on a 4090 or 5090, expect higher numbers than ours. If you're on
+something else, nothing here is going to work without your own tuning —
+that's fine, please share what you find.
+
+## The local-AI ethos
+
+Everything runs on your machine. No telemetry, no analytics, no phone-home,
+no cloud inference, no model weights downloaded behind your back. The
+launcher never opens an outbound connection except when you explicitly
+ask it to (downloading a wheel or a model from HuggingFace). This is in
+the spirit of [r/LocalLLaMA](https://www.reddit.com/r/LocalLLaMA/): your
+hardware, your weights, your prompts, your business.
+
+The wheel and the launcher are both Apache-2.0 licensed (inherited from
+upstream vLLM). Source diff is committed, every patched file is mirrored
+in [`windows_patches/`](windows_patches/) for inspection. SHA256 of every
+release asset is published alongside the release — verify before
+extracting.
+
+## Documentation
+
+- [`CHANGES_VS_SYSTEMPANIC.md`](CHANGES_VS_SYSTEMPANIC.md) — exact diff vs upstream Windows fork.
+- [`docs/INSTALL.md`](docs/INSTALL.md) — full install, including wheel-only path.
+- [`docs/HARDWARE.md`](docs/HARDWARE.md) — what works, what doesn't, and why.
+- [`docs/COHERENCE.md`](docs/COHERENCE.md) — degenerate-output guide and the 3-tier validator.
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — every failure mode we've hit, table form.
+- [`docs/TUNING.md`](docs/TUNING.md) — the lever set, anti-levers, and how to sweep your own configs.
+- [`docs/SPEC_DECODE_MATRIX.md`](docs/SPEC_DECODE_MATRIX.md) — what spec-decode + parallelism combos work on this wheel.
+- [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md) — how to free VRAM on Windows for the single-GPU case.
+- [`docs/HALLUCINATED_FLAGS.md`](docs/HALLUCINATED_FLAGS.md) — flags you'll see online that don't exist on this wheel.
+- [`docs/CREDITS.md`](docs/CREDITS.md) — vLLM team, SystemPanic, Lorbus, the community.
 
 ## Contributing
 
-We welcome and value any contributions and collaborations.
-Please check out [Contributing to vLLM](https://docs.vllm.ai/en/latest/contributing/index.html) for how to get involved.
+Bug reports welcome — please include GPU model, driver version, Windows
+build, and the relevant slice of `logs\vllm_server.<port>.log`. The
+[issue template](.github/ISSUE_TEMPLATE/bug_report.md) walks you through it.
 
-## Citation
+This fork is intentionally narrow scope: Windows + Ampere/Ada/Blackwell
+NVIDIA + Qwen3.6-27B. PRs that extend it to other models on the same
+hardware class are welcome. PRs that extend it to other operating systems
+or other GPU vendors are politely out of scope here — please go upstream.
 
-If you use vLLM for your research, please cite our [paper](https://arxiv.org/abs/2309.06180):
+## Credits
 
-```bibtex
-@inproceedings{kwon2023efficient,
-  title={Efficient Memory Management for Large Language Model Serving with PagedAttention},
-  author={Woosuk Kwon and Zhuohan Li and Siyuan Zhuang and Ying Sheng and Lianmin Zheng and Cody Hao Yu and Joseph E. Gonzalez and Hao Zhang and Ion Stoica},
-  booktitle={Proceedings of the ACM SIGOPS 29th Symposium on Operating Systems Principles},
-  year={2023}
-}
-```
-
-## Contact Us
-
-<!-- --8<-- [start:contact-us] -->
-- For technical questions and feature requests, please use GitHub [Issues](https://github.com/vllm-project/vllm/issues)
-- For discussing with fellow users, please use the [vLLM Forum](https://discuss.vllm.ai)
-- For coordinating contributions and development, please use [Slack](https://slack.vllm.ai)
-- For security disclosures, please use GitHub's [Security Advisories](https://github.com/vllm-project/vllm/security/advisories) feature
-- For collaborations and partnerships, please contact us at [collaboration@vllm.ai](mailto:collaboration@vllm.ai)
-<!-- --8<-- [end:contact-us] -->
-
-## Media Kit
-
-- If you wish to use vLLM's logo, please refer to [our media kit repo](https://github.com/vllm-project/media-kit)
+- [vLLM](https://github.com/vllm-project/vllm) — the engine.
+- [SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows) — the Windows wheel this fork is based on.
+- [Lorbus](https://huggingface.co/Lorbus) — the AutoRound INT4 quant of Qwen3.6-27B that makes any of this fast.
+- The r/LocalLLaMA community — every config in here was informed by their published recipes and brutal honesty in comments.

@@ -247,3 +247,14 @@ launcher.out
 test_out.log
 2026-*.txt
 
+# devnen / vllm-windows fork additions
+logs/
+models/
+dist/
+.build_launcher/
+launcher/python/
+runs.tsv
+*.upstream.bak
+tokenizer_config.json.bak
+
+

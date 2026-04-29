@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "vllm-windows: native Windows fork of vLLM with portable launcher"
+message: "If you reference this fork in academic work, please cite both this fork and upstream vLLM."
+authors:
+  - alias: devnen
+    affiliation: independent
+type: software
+license: Apache-2.0
+url: "https://github.com/devnen/vllm-windows"
+repository-code: "https://github.com/devnen/vllm-windows"
+keywords:
+  - vllm
+  - windows
+  - inference
+  - qwen3
+  - speculative-decoding
+  - local-llm
+references:
+  - type: software
+    title: "vLLM"
+    authors:
+      - name: "vLLM contributors"
+    url: "https://github.com/vllm-project/vllm"
+  - type: software
+    title: "vllm-windows (SystemPanic)"
+    authors:
+      - name: "SystemPanic"
+    url: "https://github.com/SystemPanic/vllm-windows"
