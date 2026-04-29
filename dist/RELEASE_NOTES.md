@@ -20,6 +20,14 @@ pip install <url-to-wheel>
 python windows_patches\verify_install.py --venv .\venv
 ```
 
+## SHA256
+
+```
+8f537f97a9fb00c0504ca644671c13a3df33ccf663ba5c40612f388c79dc4471  vllm-0.19.0+devnen.1-cp312-cp312-win_amd64.whl
+```
+
+PowerShell: `Get-FileHash vllm-0.19.0+devnen.1-cp312-cp312-win_amd64.whl -Algorithm SHA256 | Format-List`.
+
 ## Looking for a one-click launcher?
 
 Use [`devnen/qwen3.6-windows-server`](https://github.com/devnen/qwen3.6-windows-server)
