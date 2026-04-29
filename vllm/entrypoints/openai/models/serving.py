@@ -1,20 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
-import os
 from asyncio import Lock
 from collections import defaultdict
 from http import HTTPStatus
 
 from vllm.config import ModelConfig
-
-# When set to a truthy value (1/true/yes/on), the OpenAI-compatible server
-# accepts ANY value of the request "model" field and resolves it to the
-# first served base model. Useful for single-tenant single-model deployments
-# where clients should not need to know the exact --served-model-name.
-_ACCEPT_ANY_MODEL_NAME = os.environ.get(
-    "VLLM_ACCEPT_ANY_MODEL_NAME", ""
-).lower() in ("1", "true", "yes", "on")
 from vllm.engine.protocol import EngineClient
 from vllm.entrypoints.openai.engine.protocol import (
     ErrorResponse,
@@ -53,9 +44,10 @@ class OpenAIModelRegistry:
         self.base_model_paths = base_model_paths
 
     def is_base_model(self, model_name: str) -> bool:
-        if _ACCEPT_ANY_MODEL_NAME:
-            return True
-        return any(model.name == model_name for model in self.base_model_paths)
+        # devnen/vllm-windows fork: always accept any model name. Single-tenant
+        # single-model deployments (the only thing this Windows wheel is used
+        # for) shouldn't require clients to match --served-model-name exactly.
+        return True
 
     async def check_model(self, model_name: str | None) -> ErrorResponse | None:
         """Return an ErrorResponse if model_name is not served, else None."""

@@ -55,15 +55,20 @@ and an implicit-end branch in both `extract_reasoning` and
 `extract_reasoning_streaming`. Pair-checks `<tool_call>` vs
 `</tool_call>` so chat-template examples in prompts don't false-fire.
 
-### `entrypoints/openai/models/serving.py` (opt-in wildcard model name)
+### `entrypoints/openai/models/serving.py` (always-accept any model name)
 
-Adds `VLLM_ACCEPT_ANY_MODEL_NAME` env var (default off). When set to
-`1`/`true`/`yes`/`on`, `OpenAIModelRegistry.is_base_model` returns True
-for any model name, so the OpenAI server resolves any client-provided
-`"model"` field to the first served base model. Useful for single-tenant
-single-model setups where keeping client configs in sync with
-`--served-model-name` is friction. LoRA path is unaffected (`_check_model`
-checks the lora dict before falling through to `is_base_model`).
+`OpenAIModelRegistry.is_base_model` is hardwired to return `True`,
+unconditionally. The OpenAI-compatible server resolves any client-provided
+`"model"` field to the first served base model, so clients no longer need
+to match `--served-model-name` exactly. This is a deliberate fork
+deviation: the vllm-windows install is single-tenant, single-model, and
+keeping client configs in sync with the served name was friction with no
+upside. LoRA path is unaffected — `_check_model` consults the lora_requests
+dict before falling through to `is_base_model`.
+
+Earlier revision of this fork (commit 978b9752f) gated the behavior behind
+`VLLM_ACCEPT_ANY_MODEL_NAME`. That env var is no longer read; the wildcard
+is always on.
 
 ## Applying to a fresh venv
 

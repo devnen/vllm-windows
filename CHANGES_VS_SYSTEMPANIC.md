@@ -105,19 +105,27 @@ Changes in `vllm/reasoning/qwen3_reasoning_parser.py`:
 
 Mirrored to `windows_patches/qwen3_reasoning_parser.py`.
 
-### 6. `978b9752f` — Add VLLM_ACCEPT_ANY_MODEL_NAME env var for single-tenant deploys
+### 6. `978b9752f` — Add VLLM_ACCEPT_ANY_MODEL_NAME env var for single-tenant deploys (superseded by #7)
 
-When `VLLM_ACCEPT_ANY_MODEL_NAME` is truthy (1/true/yes/on),
-`OpenAIModelRegistry.is_base_model` returns `True` for any model name, so the
-OpenAI-compatible server accepts arbitrary values of the request `model` field
-and resolves them to the first served base model.
+Initially gated wildcard model-name acceptance behind
+`VLLM_ACCEPT_ANY_MODEL_NAME` (1/true/yes/on). Replaced by commit #7 which
+hardwires the behavior on — this commit is preserved for history but the
+env var is no longer read.
 
-- `vllm/entrypoints/openai/models/serving.py` — adds the env-gated short circuit.
-- `windows_patches/serving_models.py` + `windows_patches/README.md` updated.
+### 7. `<pending>` — Hardwire OpenAI server to accept any model name
+
+`OpenAIModelRegistry.is_base_model` now unconditionally returns `True`. The
+opt-in env var from commit 978b9752f is removed (along with the `import os`
+and the env-read block). The fork's vllm-windows install is single-tenant
+and single-model — clients shouldn't have to match `--served-model-name`
+exactly, so the wildcard is on by default.
+
+- `vllm/entrypoints/openai/models/serving.py` — drop env gating, return `True`.
+- `windows_patches/serving_models.py` — mirror of the same.
+- `windows_patches/README.md` — section rewritten.
 
 LoRA path is unaffected because `_check_model` consults the `lora_requests`
-dict before falling through to `is_base_model`. Default off — upstream
-behavior unchanged when the env var is unset.
+dict before falling through to `is_base_model`.
 
 ## File-by-file inventory (vs SystemPanic merge-base)
 
@@ -132,7 +140,7 @@ behavior unchanged when the env var is unset.
 | `vllm/distributed/device_communicators/cuda_communicator.py` | modified (TP CPU-relay) | c90698be3 |
 | `vllm/distributed/device_communicators/base_device_communicator.py` | modified (TP CPU-relay) | c90698be3 |
 | `vllm/reasoning/qwen3_reasoning_parser.py` | modified (`<tool_call>` as reasoning end) | 6cb754325 |
-| `vllm/entrypoints/openai/models/serving.py` | modified (`VLLM_ACCEPT_ANY_MODEL_NAME`) | 978b9752f |
+| `vllm/entrypoints/openai/models/serving.py` | modified (always-accept any model name) | 978b9752f → hardwired in commit #7 |
 | `windows_patches/README.md` | added | abc2480f8, expanded each commit |
 | `windows_patches/parallel_state.py` | added (PP CPU-relay copy) | f23a2a977 era |
 | `windows_patches/cuda_communicator.py` | added (TP CPU-relay copy) | c90698be3 |
@@ -151,7 +159,8 @@ behavior unchanged when the env var is unset.
 2. **Reasoning-parser correctness (Qwen3.5/3.6 tool calls)** —
    `qwen3_reasoning_parser.py`. Mirror of upstream PR #35687.
 3. **OpenAI server ergonomics (single-tenant)** —
-   `entrypoints/openai/models/serving.py`. Env-gated; off by default.
+   `entrypoints/openai/models/serving.py`. Hardwired wildcard: any
+   client-provided `"model"` value resolves to the first served base model.
 
 **Local launchers / scripts (not part of vLLM proper):**
 - `start.bat`, `start_qwen.py`, `qwen3.6-27b.bat`, `test_qwen.py`, `bench_popos.py`.
