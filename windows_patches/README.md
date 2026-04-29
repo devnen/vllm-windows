@@ -55,6 +55,64 @@ and an implicit-end branch in both `extract_reasoning` and
 `extract_reasoning_streaming`. Pair-checks `<tool_call>` vs
 `</tool_call>` so chat-template examples in prompts don't false-fire.
 
+### `tool_parsers/qwen3coder_tool_parser.py`, `tool_parsers/qwen3xml_tool_parser.py`, `tool_parsers/utils.py`, `tool_parsers/abstract_tool_parser.py` (PR #40861 mirror)
+
+Backport of [vllm-project/vllm#40861](https://github.com/vllm-project/vllm/pull/40861)
+("Bugfix: Fix Qwen3 XML and Coder streaming tool call parser
+regressions"). Open upstream as of this writing — vendored here against
+the recurring tool-call failures the OP catalogues.
+
+What it fixes:
+
+- **`Qwen3CoderToolParser` streaming**:
+  - Split `<tool_call>` tag detection — when the tag fragments across
+    two deltas (e.g. `<tool_` then `call>`), the prior parser dropped the
+    call silently.
+  - Header-vs-params split: when `<tool_call><function=name>` arrives in
+    delta 1 and the params + `</function>` arrive in delta 2, parameters
+    were dropped.
+  - Last content message not flushed after all tool calls completed.
+  - Structural delimiters (`</tool_call>`, `</function>`, `</parameter>`)
+    appearing as **literal text** inside a parameter value (e.g. when the
+    user asks the model to write code or documentation that contains those
+    strings) were treated as closing delimiters, truncating or corrupting
+    the value.
+- **`Qwen3XMLToolParser` streaming**:
+  - Delayed text emission between consecutive tool calls.
+  - `anyOf` schema-type detection: nullable schemas
+    (`{"anyOf": [{"type":"string"}, {"type":"null"}]}`) were classified as
+    `"object"`, triggering `json.loads` and crashing on plain strings.
+  - Double-close fallback when `</parameter>` appeared inside a value.
+- **Both parsers**: speculative decoding could deliver several complete
+  tool calls in a single delta; only the first was emitted.
+
+The two parser files are wholesale replacements (head of the upstream PR
+branch `ExtReMLapin/vllm@qwen3_combined_fixes`). `utils.py` adds two
+helpers (`partial_tag_overlap`, `find_tool_properties`); the rest of the
+file is unchanged. `abstract_tool_parser.py` adds a
+`supports_required_and_named` class attribute and tightens the
+Pydantic v2 construction of `ResponseTextConfig` so that nested tool
+config isn't silently dropped from `model_dump`.
+
+End-to-end verification lives at
+`C:\_projects\vllm-turbo\test_toolcall.py` (8 tests covering simple
+calls, special characters in args, CoT leakage, multi-turn, streaming
+parity, structural-delimiter literals in values, parallel calls, and a
+5-round agentic chain). All 8 pass on the patched fork running the
+`start_toolcall` snapshot.
+
+### `templates/qwen3.5-enhanced.jinja`
+
+Vendored at the repo root under `templates/`, not under
+`windows_patches/` because it is a *template asset*, not a source
+overlay. M2.5-style interleaved-thinking chat template — closes
+`</thinking>` properly before tool calls and treats any unclosed
+`<thinking>` block in history as plain content, not reasoning content.
+Required by the canonical Qwen 3.6 agentic recipe (paired with
+`--tool-call-parser=qwen3_coder` and
+`--default-chat-template-kwargs='{"preserve_thinking": false}'`).
+Source: [`allanchan339/vLLM-Qwen3.5-27B`](https://github.com/allanchan339/vLLM-Qwen3.5-27B).
+
 ### `entrypoints/openai/models/serving.py` (always-accept any model name)
 
 `OpenAIModelRegistry.is_base_model` is hardwired to return `True`,
@@ -81,6 +139,10 @@ cp windows_patches/cuda_communicator.py           venv/Lib/site-packages/vllm/di
 cp windows_patches/base_device_communicator.py    venv/Lib/site-packages/vllm/distributed/device_communicators/base_device_communicator.py
 cp windows_patches/gpu_worker.py                  venv/Lib/site-packages/vllm/v1/worker/gpu_worker.py
 cp windows_patches/qwen3_reasoning_parser.py      venv/Lib/site-packages/vllm/reasoning/qwen3_reasoning_parser.py
+cp windows_patches/qwen3coder_tool_parser.py      venv/Lib/site-packages/vllm/tool_parsers/qwen3coder_tool_parser.py
+cp windows_patches/qwen3xml_tool_parser.py        venv/Lib/site-packages/vllm/tool_parsers/qwen3xml_tool_parser.py
+cp windows_patches/tool_parsers_utils.py          venv/Lib/site-packages/vllm/tool_parsers/utils.py
+cp windows_patches/abstract_tool_parser.py        venv/Lib/site-packages/vllm/tool_parsers/abstract_tool_parser.py
 cp windows_patches/serving_models.py              venv/Lib/site-packages/vllm/entrypoints/openai/models/serving.py
 ```
 

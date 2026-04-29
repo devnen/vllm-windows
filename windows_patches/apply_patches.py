@@ -24,12 +24,18 @@ PATCHES = REPO / "windows_patches"
 
 # Map: source file in windows_patches/  ->  destination relative to venv site-packages.
 _DC = "vllm/distributed/device_communicators"
+_TP = "vllm/tool_parsers"
 MAP = {
     "parallel_state.py": "vllm/distributed/parallel_state.py",
     "cuda_communicator.py": f"{_DC}/cuda_communicator.py",
     "base_device_communicator.py": f"{_DC}/base_device_communicator.py",
     "gpu_worker.py": "vllm/v1/worker/gpu_worker.py",
     "qwen3_reasoning_parser.py": "vllm/reasoning/qwen3_reasoning_parser.py",
+    # PR #40861 backport — Qwen3 tool parser streaming fixes.
+    "qwen3coder_tool_parser.py": f"{_TP}/qwen3coder_tool_parser.py",
+    "qwen3xml_tool_parser.py": f"{_TP}/qwen3xml_tool_parser.py",
+    "tool_parsers_utils.py": f"{_TP}/utils.py",
+    "abstract_tool_parser.py": f"{_TP}/abstract_tool_parser.py",
     "serving_models.py": "vllm/entrypoints/openai/models/serving.py",
 }
 

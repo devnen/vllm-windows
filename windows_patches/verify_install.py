@@ -26,12 +26,17 @@ REPO = Path(__file__).resolve().parent.parent
 PATCHES = REPO / "windows_patches"
 
 _DC = "vllm/distributed/device_communicators"
+_TP = "vllm/tool_parsers"
 PATCH_MAP = {
     "parallel_state.py": "vllm/distributed/parallel_state.py",
     "cuda_communicator.py": f"{_DC}/cuda_communicator.py",
     "base_device_communicator.py": f"{_DC}/base_device_communicator.py",
     "gpu_worker.py": "vllm/v1/worker/gpu_worker.py",
     "qwen3_reasoning_parser.py": "vllm/reasoning/qwen3_reasoning_parser.py",
+    "qwen3coder_tool_parser.py": f"{_TP}/qwen3coder_tool_parser.py",
+    "qwen3xml_tool_parser.py": f"{_TP}/qwen3xml_tool_parser.py",
+    "tool_parsers_utils.py": f"{_TP}/utils.py",
+    "abstract_tool_parser.py": f"{_TP}/abstract_tool_parser.py",
     "serving_models.py": "vllm/entrypoints/openai/models/serving.py",
 }
 
@@ -130,11 +135,14 @@ def main() -> int:
     print(f"== verifying {venv} ==\n")
 
     rows: list[tuple[str, str, str]] = []
-    rows.append(("vllm",) + check_vllm(venv))
-    for src, lvl, msg in check_patches(venv):
-        rows.append(("patch:" + src, lvl, msg))
-    rows.append(("gpu",) + check_gpu())
-    rows.append(("msvc",) + check_msvc())
+    v_lvl, v_msg = check_vllm(venv)
+    rows.append(("vllm", v_lvl, v_msg))
+    for lvl, src_name, msg in check_patches(venv):
+        rows.append(("patch:" + src_name, lvl, msg))
+    g_lvl, g_msg = check_gpu()
+    rows.append(("gpu", g_lvl, g_msg))
+    m_lvl, m_msg = check_msvc()
+    rows.append(("msvc", m_lvl, m_msg))
 
     bad_any = any(lvl == "RED" for _, lvl, _ in rows)
     yellow = any(lvl == "YEL" for _, lvl, _ in rows)
