@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Sanity-check: vLLM install, patches applied, GPU present.
 
 Run after install / before launch. Prints a green / yellow / red summary.
@@ -10,6 +12,7 @@ Checks:
 
 Exit code 0 = all green. 1 = at least one red. 2 = warnings only.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,13 +25,14 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 PATCHES = REPO / "windows_patches"
 
+_DC = "vllm/distributed/device_communicators"
 PATCH_MAP = {
-    "parallel_state.py":            "vllm/distributed/parallel_state.py",
-    "cuda_communicator.py":         "vllm/distributed/device_communicators/cuda_communicator.py",
-    "base_device_communicator.py":  "vllm/distributed/device_communicators/base_device_communicator.py",
-    "gpu_worker.py":                "vllm/v1/worker/gpu_worker.py",
-    "qwen3_reasoning_parser.py":    "vllm/reasoning/qwen3_reasoning_parser.py",
-    "serving_models.py":            "vllm/entrypoints/openai/models/serving.py",
+    "parallel_state.py": "vllm/distributed/parallel_state.py",
+    "cuda_communicator.py": f"{_DC}/cuda_communicator.py",
+    "base_device_communicator.py": f"{_DC}/base_device_communicator.py",
+    "gpu_worker.py": "vllm/v1/worker/gpu_worker.py",
+    "qwen3_reasoning_parser.py": "vllm/reasoning/qwen3_reasoning_parser.py",
+    "serving_models.py": "vllm/entrypoints/openai/models/serving.py",
 }
 
 
@@ -43,7 +47,8 @@ def check_vllm(venv: Path) -> tuple[str, str]:
     try:
         out = subprocess.check_output(
             [str(py), "-c", "import vllm; print(vllm.__version__)"],
-            text=True, timeout=30,
+            text=True,
+            timeout=30,
         ).strip()
     except subprocess.CalledProcessError as e:
         return ("RED", f"vllm import failed: {e}")
@@ -77,11 +82,12 @@ def check_gpu() -> tuple[str, str]:
     try:
         out = subprocess.check_output(
             ["nvidia-smi", "--query-gpu=name,compute_cap", "--format=csv,noheader"],
-            text=True, timeout=10,
+            text=True,
+            timeout=10,
         )
     except subprocess.CalledProcessError as e:
         return ("RED", f"nvidia-smi failed: {e}")
-    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
     if not lines:
         return ("RED", "no GPU reported")
     bad = []
@@ -108,7 +114,10 @@ def check_msvc() -> tuple[str, str]:
     ]
     for c in candidates:
         if Path(c).exists():
-            return ("YEL", f"MSVC found at {c} but not on PATH (only matters for FlashInfer)")
+            return (
+                "YEL",
+                f"MSVC found at {c} but not on PATH (only matters for FlashInfer)",
+            )
     return ("YEL", "MSVC not found — fine for TRITON_ATTN; FlashInfer JIT would fail")
 
 

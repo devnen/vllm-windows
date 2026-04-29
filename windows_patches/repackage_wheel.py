@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Repackage SystemPanic vLLM wheel as 0.19.0+devnen.<N>.
 
 Takes the upstream wheel, overlays the patched files from this folder
@@ -18,12 +20,12 @@ Output filename:
     devnen tag is the meaningful identifier; the binary blobs inside
     are identical to the upstream wheel.)
 """
+
 from __future__ import annotations
 
 import argparse
 import base64
 import hashlib
-import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -33,29 +35,31 @@ PATCHES_DIR = Path(__file__).resolve().parent
 # Map of in-wheel path -> our local mirror copy.
 # Wheel paths are relative to the wheel root (forward slashes).
 PATCH_MAP = {
-    "vllm/distributed/parallel_state.py":
-        PATCHES_DIR / "parallel_state.py",
-    "vllm/distributed/device_communicators/cuda_communicator.py":
-        PATCHES_DIR / "cuda_communicator.py",
-    "vllm/distributed/device_communicators/base_device_communicator.py":
-        PATCHES_DIR / "base_device_communicator.py",
-    "vllm/v1/worker/gpu_worker.py":
-        PATCHES_DIR / "gpu_worker.py",
-    "vllm/reasoning/qwen3_reasoning_parser.py":
-        PATCHES_DIR / "qwen3_reasoning_parser.py",
-    "vllm/entrypoints/openai/models/serving.py":
-        PATCHES_DIR / "serving_models.py",
+    "vllm/distributed/parallel_state.py": PATCHES_DIR / "parallel_state.py",
+    "vllm/distributed/device_communicators/cuda_communicator.py": PATCHES_DIR
+    / "cuda_communicator.py",
+    "vllm/distributed/device_communicators/base_device_communicator.py": PATCHES_DIR
+    / "base_device_communicator.py",
+    "vllm/v1/worker/gpu_worker.py": PATCHES_DIR / "gpu_worker.py",
+    "vllm/reasoning/qwen3_reasoning_parser.py": PATCHES_DIR
+    / "qwen3_reasoning_parser.py",
+    "vllm/entrypoints/openai/models/serving.py": PATCHES_DIR / "serving_models.py",
 }
 
 
 def b64sha(data: bytes) -> str:
-    return "sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+    return (
+        "sha256="
+        + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+    )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="src", required=True, help="upstream .whl path")
-    ap.add_argument("--tag", default="devnen.1", help="local-version tag (default: devnen.1)")
+    ap.add_argument(
+        "--tag", default="devnen.1", help="local-version tag (default: devnen.1)"
+    )
     ap.add_argument("--out", default=str(Path("dist")), help="output directory")
     args = ap.parse_args()
 
@@ -85,7 +89,15 @@ def main() -> int:
     with zipfile.ZipFile(src, "r") as zin:
         names = zin.namelist()
         # Find the dist-info folder name (e.g. "vllm-0.19.0+cu124.dist-info")
-        dist_info_dirs = sorted({n.split("/", 1)[0] for n in names if n.endswith(".dist-info") or "/.dist-info" in n or n.split("/", 1)[0].endswith(".dist-info")})
+        dist_info_dirs = sorted(
+            {
+                n.split("/", 1)[0]
+                for n in names
+                if n.endswith(".dist-info")
+                or "/.dist-info" in n
+                or n.split("/", 1)[0].endswith(".dist-info")
+            }
+        )
         old_dist_info = next(n for n in dist_info_dirs if n.endswith(".dist-info"))
         new_dist_info = f"vllm-{new_version}.dist-info"
         print(f"[repack] {old_dist_info} -> {new_dist_info}")
@@ -104,7 +116,7 @@ def main() -> int:
 
             # Rename dist-info folder.
             if name.startswith(old_dist_info + "/") or name == old_dist_info:
-                new_name = new_dist_info + name[len(old_dist_info):]
+                new_name = new_dist_info + name[len(old_dist_info) :]
 
             # Apply patches.
             if name in PATCH_MAP:

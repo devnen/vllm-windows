@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Overlay the windows_patches/ files onto an installed vLLM venv.
 
 Use this when you've installed the SystemPanic wheel (or the unpatched
@@ -9,6 +11,7 @@ Usage:
 
 The --venv flag is optional; default is ../venv relative to repo root.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,13 +23,14 @@ REPO = Path(__file__).resolve().parent.parent
 PATCHES = REPO / "windows_patches"
 
 # Map: source file in windows_patches/  ->  destination relative to venv site-packages.
+_DC = "vllm/distributed/device_communicators"
 MAP = {
-    "parallel_state.py":            "vllm/distributed/parallel_state.py",
-    "cuda_communicator.py":         "vllm/distributed/device_communicators/cuda_communicator.py",
-    "base_device_communicator.py":  "vllm/distributed/device_communicators/base_device_communicator.py",
-    "gpu_worker.py":                "vllm/v1/worker/gpu_worker.py",
-    "qwen3_reasoning_parser.py":    "vllm/reasoning/qwen3_reasoning_parser.py",
-    "serving_models.py":            "vllm/entrypoints/openai/models/serving.py",
+    "parallel_state.py": "vllm/distributed/parallel_state.py",
+    "cuda_communicator.py": f"{_DC}/cuda_communicator.py",
+    "base_device_communicator.py": f"{_DC}/base_device_communicator.py",
+    "gpu_worker.py": "vllm/v1/worker/gpu_worker.py",
+    "qwen3_reasoning_parser.py": "vllm/reasoning/qwen3_reasoning_parser.py",
+    "serving_models.py": "vllm/entrypoints/openai/models/serving.py",
 }
 
 
