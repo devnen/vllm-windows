@@ -2,8 +2,11 @@ name: pre-commit
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  # NOTE (devnen fork): pushes to main are intentionally not gated by
+  # upstream's full pre-commit suite. This repo carries Windows-specific
+  # patches (e.g. conditional `os.name == "nt"` imports in cuda_communicator.py
+  # that legitimately trip E402) and fork-only docs that don't conform to
+  # upstream's markdownlint/ruff style. PRs are still gated.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
