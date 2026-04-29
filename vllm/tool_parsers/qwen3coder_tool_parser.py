@@ -1388,6 +1388,13 @@ class Qwen3CoderToolParser(ToolParser):
             # the per-tool processing never advances ``_sent_content_idx``
             # past its tool's ``</tool_call>``, and an EOS-style empty
             # delta cannot recover content that was never emitted.
+            #
+            # CRITICAL: if a new ``<tool_call>`` opener (or partial-tag
+            # overlap of one) follows the last structural close, that
+            # text is the START of the next tool call and MUST NOT be
+            # emitted as content — emitting it leaks the next tool's
+            # raw XML to the user (e.g. parallel-call leak where the
+            # second of N parallel calls renders as plain text).
             if self.json_closed and not self.in_function:
                 end_positions = self._structural_tool_call_end_positions(
                     current_text
@@ -1400,9 +1407,35 @@ class Qwen3CoderToolParser(ToolParser):
                         last_end < len(current_text)
                         and last_end > self._sent_content_idx
                     ):
-                        trailing = current_text[last_end:]
-                        if trailing:
-                            self._sent_content_idx = len(current_text)
+                        trailing_region = current_text[last_end:]
+                        next_open = trailing_region.find(
+                            self.tool_call_start_token
+                        )
+                        if next_open == -1:
+                            # No next tool yet — trim partial-tag
+                            # overlap so a half-typed ``<tool_`` at
+                            # the buffer tail isn't emitted prematurely.
+                            overlap = partial_tag_overlap(
+                                trailing_region, self.tool_call_start_token
+                            )
+                            trailing = (
+                                trailing_region[:-overlap]
+                                if overlap
+                                else trailing_region
+                            )
+                            advance_idx = (
+                                len(current_text) - overlap
+                                if overlap
+                                else len(current_text)
+                            )
+                        else:
+                            # A new tool call begins after this delta's
+                            # last close. Emit only the free text BEFORE
+                            # its opener.
+                            trailing = trailing_region[:next_open]
+                            advance_idx = last_end + next_open
+                        if trailing and advance_idx > self._sent_content_idx:
+                            self._sent_content_idx = advance_idx
                             result.content = (
                                 (result.content or "") + trailing
                             )

@@ -85,9 +85,23 @@ What it fixes:
   - Double-close fallback when `</parameter>` appeared inside a value.
 - **Both parsers**: speculative decoding could deliver several complete
   tool calls in a single delta; only the first was emitted.
+- **Local fix on top of PR #40861 (parallel-call streaming leak)**: when
+  3+ parallel `<tool_call>` blocks were emitted in one assistant turn,
+  the trailing-free-text emission at the end of
+  `extract_tool_calls_streaming` (added by PR #40861 to flush content
+  that follows the last `</tool_call>` in MTP / spec-decode bursts)
+  also matched the *opener* of the next tool call sitting in
+  `current_text`, leaking that next call's raw XML
+  (`<tool_call><function=...><parameter=...>...</tool_call>`) into the
+  `delta.content` stream while ALSO emitting the same call structurally
+  via `delta.tool_calls`. Chat clients then rendered the leaked XML as
+  plain text in the conversation. Fixed by clipping the trailing region
+  at the next `<tool_call>` opener (or its partial-tag overlap) before
+  emitting. Regression test: `test_toolcall.py::t9_parallel_streaming_leak`.
 
 The two parser files are wholesale replacements (head of the upstream PR
-branch `ExtReMLapin/vllm@qwen3_combined_fixes`). `utils.py` adds two
+branch `ExtReMLapin/vllm@qwen3_combined_fixes`) plus the parallel-call
+trailing-text fix above. `utils.py` adds two
 helpers (`partial_tag_overlap`, `find_tool_properties`); the rest of the
 file is unchanged. `abstract_tool_parser.py` adds a
 `supports_required_and_named` class attribute and tightens the
@@ -95,11 +109,11 @@ Pydantic v2 construction of `ResponseTextConfig` so that nested tool
 config isn't silently dropped from `model_dump`.
 
 End-to-end verification lives at
-`C:\_projects\vllm-turbo\test_toolcall.py` (8 tests covering simple
+`C:\_projects\vllm-turbo\test_toolcall.py` (9 tests covering simple
 calls, special characters in args, CoT leakage, multi-turn, streaming
-parity, structural-delimiter literals in values, parallel calls, and a
-5-round agentic chain). All 8 pass on the patched fork running the
-`start_toolcall` snapshot.
+parity, structural-delimiter literals in values, parallel calls, a
+5-round agentic chain, and the 3-call streaming-leak regression). All
+9 pass on the patched fork.
 
 ### `templates/qwen3.5-enhanced.jinja`
 
