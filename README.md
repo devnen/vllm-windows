@@ -1,145 +1,142 @@
-# vllm-windows
+# vllm-windows (devnen patched fork)
 
-> Native Windows fork of [vLLM](https://github.com/vllm-project/vllm) — no
-> WSL, no Docker, no conda bootstrap. Prebuilt wheel, portable launcher,
-> validated configs for Qwen3.6-27B on RTX 3090 / 4090. **Everything runs
-> on your machine. No telemetry, no analytics, no phone-home.**
+> **A patched native-Windows build of [vLLM](https://github.com/vllm-project/vllm).**
+> Three Windows-specific fixes on top of [SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows)
+> 0.19.0. Source tree, patch backups, and prebuilt wheels.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Made for Windows](https://img.shields.io/badge/OS-Windows%2010%2F11-0078d6.svg)](https://www.microsoft.com/windows)
-[![GPU](https://img.shields.io/badge/tested-RTX%203090%20%C3%97%202-76b900.svg)](https://www.nvidia.com/)
 
 ---
 
-## Why this exists
+## Looking for the launcher?
 
-vLLM is the fastest single-user inference engine on consumer NVIDIA right now.
-Most fast Qwen3.6-27B recipes on r/LocalLLaMA assume Linux + Docker + WSL.
-That's a tax: one community member measured the same 5090 going from
-**85 tok/s in WSL to 160 tok/s in native Ubuntu**. Windows users either
-take the WSL hit or don't run vLLM.
+If you came here looking for **a one-click way to run Qwen3.6-27B fast on
+Windows**, you want the matching launcher repo:
 
-This fork is the third option. Same vLLM core, but with the Windows-specific
-patches that make it actually work natively, packaged so the install is:
+> **[devnen/qwen3.6-windows-server](https://github.com/devnen/qwen3.6-windows-server)** — portable Textual TUI, validated configs, the wheel from this repo bundled inside. Unzip and double-click.
 
-```text
-1. Download the launcher zip from Releases.
-2. Unzip.
-3. Double-click start.bat.
-```
+This repo (`vllm-windows`) is the engine layer underneath: the patched
+vLLM source, patch backups, and the wheel build. End users normally don't
+need it.
 
-No pip, no conda, no `curl | bash`. The launcher ships with an embedded
-Python runtime — every dependency is preinstalled inside the zip.
+## What this fork is
 
-## What you get
+A thin patch series on top of [`SystemPanic/vllm-windows`](https://github.com/SystemPanic/vllm-windows) — the
+existing community Windows build of vLLM, base version 0.19.0. We add
+three patches that make a few real-world inference workloads actually
+work on Windows. The full diff lives at
+[`CHANGES_VS_SYSTEMPANIC.md`](CHANGES_VS_SYSTEMPANIC.md).
 
-**On a single RTX 3090 (24 GB) running Qwen3.6-27B Lorbus AutoRound INT4:**
+| # | Patch | Why |
+|---|-------|-----|
+| 1 | **CPU-relay for Gloo collectives** | Windows has no NCCL. PP/TP collectives hang or `0xC0000005` on CUDA tensors. Patches `parallel_state.py`, `cuda_communicator.py`, `base_device_communicator.py`, `gpu_worker.py` to stage through pinned CPU buffers when `os.name == "nt"`. |
+| 2 | **Qwen3 reasoning parser fix** | Mirror of upstream PR [#35687](https://github.com/vllm-project/vllm/pull/35687). Treats `<tool_call>` as an implicit `</think>` so unclosed reasoning blocks don't swallow tool calls. |
+| 3 | **Hardwired wildcard model name** | `OpenAIModelRegistry.is_base_model` always returns `True`. Single-tenant single-model deployments shouldn't require clients to match `--served-model-name` exactly. |
 
-| Snapshot              | Decode tok/s | Context | Notes                                          |
-|-----------------------|--------------|---------|------------------------------------------------|
-| `start_speed`         | **64.5**     | 90k     | Peak decode — MTP n=6 sweet spot for long prompts |
-| `start_127k`          | 53.4         | 127k    | Maximum context on a single GPU                |
-| `start_mtp4`          | 58.3         | 120k    | Mid-balance speed vs context                   |
-| `start_72tps`         | ~72 short    | 32k     | Original short-prompt baseline                 |
-| `start_pp2_160k` (2× GPU) | 43.5     | 160k    | Pipeline-parallel for the largest contexts     |
-| `start_gpu0_50k`      | volatile     | ~9–50k  | Single-GPU users with the display attached     |
-
-All numbers measured on a 24 KB / ~24 k-token Python source-summary prompt.
-[Coherence-validated](docs/COHERENCE.md) — TPS without coherence is a lie.
-
-## What's actually in this fork (vs SystemPanic upstream)
-
-Three patches against `SystemPanic/vllm-windows` 0.19.0, full diff in
-[`CHANGES_VS_SYSTEMPANIC.md`](CHANGES_VS_SYSTEMPANIC.md):
-
-1. **CPU-relay for Gloo collectives.** Windows has no real NCCL. Pipeline
-   and tensor parallelism hang on CUDA tensors without staging through
-   pinned CPU buffers. Patches `parallel_state.py`, `cuda_communicator.py`,
-   `base_device_communicator.py`. PP=2 works at 43 tok/s; TP=2 works but
-   is dominated by CPU-relay and isn't worth using.
-2. **Qwen3 reasoning-parser fix** (mirror of upstream PR #35687) so
-   `<tool_call>` doesn't get silently swallowed inside an unclosed
-   `<think>` block.
-3. **Hardwired wildcard model name** — clients no longer need to match
-   `--served-model-name` exactly. The fork is single-tenant single-model
-   by design.
+Patched files live under `vllm/` (the source tree, what gets built into
+the wheel) **and** under `windows_patches/` (verbatim mirror copies, so
+the patches survive a clean wheel install — apply them with
+`python windows_patches/apply_patches.py --venv <venv>`).
 
 ## Install
 
-**The 60-second path:**
+### Prebuilt wheel (recommended)
 
-1. Grab `vllm-windows-launcher-portable-x64.zip` from the latest
-   [Release](../../releases). Extract anywhere (no admin needed).
-2. Either set `VLLM_MODEL_DIR` to your Qwen3.6 weights folder, or drop the
-   model into `models\Qwen3.6-27B-int4-AutoRound\` next to the launcher.
-3. Double-click `start.bat`. The TUI lists every snapshot. Pick one,
-   press Enter, you're serving.
+Grab the latest `vllm-0.19.0+devnen.<n>-cp312-cp312-win_amd64.whl` from
+the [Releases](../../releases/latest) page, then:
 
-Detailed install (including the wheel-only path for users who already have
-their own venv): see [`docs/INSTALL.md`](docs/INSTALL.md).
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install <path-to-downloaded-wheel>
+```
 
-## Hardware reality
+The patches are baked into the wheel — no separate apply step needed.
+Verify:
 
-This fork was tuned and tested on:
+```powershell
+python windows_patches\verify_install.py --venv .\venv
+```
 
-- Windows 10 Enterprise 22H2
-- 2× NVIDIA RTX 3090 (Ampere, sm_86), no NVLink, PCIe Gen 4
-- Power cap up to 350 W per card
+Green output = patches in place.
 
-It **should** work on any Ampere or newer GPU (3090, 4090, 5090, A6000)
-running Windows 10/11. It will not work on Pascal/Turing, Intel Arc, or
-any AMD card. **One card with the display attached** loses 1–3 GiB of
-VRAM to the Windows desktop compositor and another 2–5 GiB to running
-apps — see [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md)
-for the workarounds, and use the `start_gpu0_50k` snapshot when you have
-no display-free GPU available.
+### From SystemPanic's wheel + patch overlay
 
-If you're on a 4090 or 5090, expect higher numbers than ours. If you're on
-something else, nothing here is going to work without your own tuning —
-that's fine, please share what you find.
+If you already have `SystemPanic/vllm-windows` 0.19.0 installed and just
+want the patches:
 
-## The local-AI ethos
+```powershell
+git clone https://github.com/devnen/vllm-windows.git
+cd vllm-windows
+python windows_patches\apply_patches.py --venv <path-to-your-venv>
+python windows_patches\verify_install.py --venv <path-to-your-venv>
+```
 
-Everything runs on your machine. No telemetry, no analytics, no phone-home,
-no cloud inference, no model weights downloaded behind your back. The
-launcher never opens an outbound connection except when you explicitly
-ask it to (downloading a wheel or a model from HuggingFace). This is in
-the spirit of [r/LocalLLaMA](https://www.reddit.com/r/LocalLLaMA/): your
-hardware, your weights, your prompts, your business.
+`apply_patches.py` is idempotent. Re-running it after a `pip install
+--force-reinstall` of the upstream wheel will re-apply the patches
+cleanly.
 
-The wheel and the launcher are both Apache-2.0 licensed (inherited from
-upstream vLLM). Source diff is committed, every patched file is mirrored
-in [`windows_patches/`](windows_patches/) for inspection. SHA256 of every
-release asset is published alongside the release — verify before
-extracting.
+### From source
 
-## Documentation
+CUDA 12.6, MSVC 2022 Community, PyTorch 2.11.0+cu126. Build follows
+SystemPanic's [original instructions](https://github.com/SystemPanic/vllm-windows#building-from-source)
+verbatim — we don't change the build system. Expect 2–4 hours on a
+5950X-class machine.
 
-- [`CHANGES_VS_SYSTEMPANIC.md`](CHANGES_VS_SYSTEMPANIC.md) — exact diff vs upstream Windows fork.
-- [`docs/INSTALL.md`](docs/INSTALL.md) — full install, including wheel-only path.
-- [`docs/HARDWARE.md`](docs/HARDWARE.md) — what works, what doesn't, and why.
-- [`docs/COHERENCE.md`](docs/COHERENCE.md) — degenerate-output guide and the 3-tier validator.
-- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — every failure mode we've hit, table form.
-- [`docs/TUNING.md`](docs/TUNING.md) — the lever set, anti-levers, and how to sweep your own configs.
-- [`docs/SPEC_DECODE_MATRIX.md`](docs/SPEC_DECODE_MATRIX.md) — what spec-decode + parallelism combos work on this wheel.
-- [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md) — how to free VRAM on Windows for the single-GPU case.
-- [`docs/HALLUCINATED_FLAGS.md`](docs/HALLUCINATED_FLAGS.md) — flags you'll see online that don't exist on this wheel.
-- [`docs/CREDITS.md`](docs/CREDITS.md) — vLLM team, SystemPanic, Lorbus, the community.
+## What this repo is _not_
+
+- **Not** a fork tracking `vllm-project/main`. Base is
+  `SystemPanic/vllm-windows` at commit `76aefe152`. Newer SystemPanic
+  releases are reachable via the `upstream` git remote but the patches
+  here target the 0.19.0 internals (which got refactored upstream).
+- **Not** a launcher / app / TUI. That's
+  [`devnen/qwen3.6-windows-server`](https://github.com/devnen/qwen3.6-windows-server).
+- **Not** scope-broadened to other operating systems or non-NVIDIA GPUs.
+
+## What's in the box
+
+```
+vllm/                       Patched vLLM source tree (what gets built).
+windows_patches/            Patch mirror copies + apply/verify scripts.
+  README.md                 Per-file root-cause + diff explanation.
+  apply_patches.py          Overlay patches onto an existing venv.
+  verify_install.py         sha256 check the in-venv files match windows_patches/.
+  *.py                      Patched file copies.
+CHANGES_VS_SYSTEMPANIC.md   Commit-by-commit diff vs the upstream Windows fork.
+```
+
+## Compatibility
+
+Wheel built against:
+
+- Python 3.12.x
+- CUDA 12.6
+- PyTorch 2.11.0+cu126 (matching torch nightly index URL in upstream
+  build instructions)
+- Windows 10 / 11 x64
+- NVIDIA Ampere (sm_86) or newer
+
+Nothing exotic about the build vs SystemPanic's wheel — same toolchain,
+same CUDA, same Python. Only the source diff changes.
 
 ## Contributing
 
-Bug reports welcome — please include GPU model, driver version, Windows
-build, and the relevant slice of `logs\vllm_server.<port>.log`. The
-[issue template](.github/ISSUE_TEMPLATE/bug_report.md) walks you through it.
-
-This fork is intentionally narrow scope: Windows + Ampere/Ada/Blackwell
-NVIDIA + Qwen3.6-27B. PRs that extend it to other models on the same
-hardware class are welcome. PRs that extend it to other operating systems
-or other GPU vendors are politely out of scope here — please go upstream.
+Bug reports for the **patches** (CPU-relay regressions, parser quirks,
+model-name acceptance) are welcome. Bug reports for upstream vLLM
+behaviour should go to [`vllm-project/vllm`](https://github.com/vllm-project/vllm/issues).
+Bug reports for the Windows build toolchain should go to
+[`SystemPanic/vllm-windows`](https://github.com/SystemPanic/vllm-windows/issues).
+Bug reports for the user-facing launcher should go to
+[`devnen/qwen3.6-windows-server`](https://github.com/devnen/qwen3.6-windows-server/issues).
 
 ## Credits
 
-- [vLLM](https://github.com/vllm-project/vllm) — the engine.
-- [SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows) — the Windows wheel this fork is based on.
-- [Lorbus](https://huggingface.co/Lorbus) — the AutoRound INT4 quant of Qwen3.6-27B that makes any of this fast.
-- The r/LocalLLaMA community — every config in here was informed by their published recipes and brutal honesty in comments.
+- [vLLM](https://github.com/vllm-project/vllm) — the engine. Apache-2.0.
+- [SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows) — the upstream Windows wheel build infrastructure this fork is based on.
+- [Qwen team](https://huggingface.co/Qwen) — the model class these patches happen to be tuned for.
+- Upstream PR [#35687](https://github.com/vllm-project/vllm/pull/35687) — origin of the Qwen3 reasoning parser fix mirrored here.
+
+## License
+
+Apache-2.0, inherited from upstream vLLM. See [`LICENSE`](LICENSE).
