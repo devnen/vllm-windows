@@ -196,6 +196,19 @@ cython_debug/
 
 # Cursor
 .cursor/
+.cursorrules
+
+# Aider
+.aider*
+
+# Windsurf
+.windsurfrules
+
+# Gemini
+GEMINI.md
+
+# Local-only agent scratchpads (CLAUDE.md and AGENTS.md are tracked upstream)
+AGENT_NOTES.md
 
 # DS Store
 .DS_Store
