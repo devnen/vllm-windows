@@ -1,13 +1,44 @@
 # vllm-windows (devnen patched fork)
 
 > **A patched native-Windows build of [vLLM](https://github.com/vllm-project/vllm).**
-> Windows-specific fixes plus Qwen3.5/3.6 tool-calling backports on top of
-> [SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows)
-> 0.19.0. Source tree, patch backups, prebuilt wheels, and the matching
-> `qwen3.5-enhanced.jinja` chat template.
+> Windows-specific fixes plus Qwen3.5/3.6 tool-calling backports. Source tree,
+> patch backups, prebuilt wheels, and the matching `qwen3.5-enhanced.jinja`
+> chat template. **Two wheels published:** Ampere/Ada (vLLM 0.19.0, cu126)
+> and Blackwell (vLLM 0.20.0, cu132).
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Made for Windows](https://img.shields.io/badge/OS-Windows%2010%2F11-0078d6.svg)](https://www.microsoft.com/windows)
+
+---
+
+## Which wheel do I need?
+
+| Your GPU | Wheel | vLLM | torch / CUDA | Driver |
+|---|---|---|---|---|
+| RTX 30 / 40 series (Ampere sm_86, Ada sm_89) | [`vllm-0.19.0+devnen.1-cp312-cp312-win_amd64.whl`](../../releases/latest) | 0.19.0 | 2.7 / cu126 | 553+ |
+| **RTX 50 series (Blackwell sm_120) — 5060 / 5070 / 5080 / 5090** | [`vllm-0.20.0+cu132.devnen.1-cp312-cp312-win_amd64.whl`](../../releases/latest) | 0.20.0 | 2.9 / cu132 | **596+** |
+
+> ### 🆕 Blackwell (RTX 50-series) support
+>
+> The **Blackwell wheel** (`+cu132.devnen.1`) is a separate build against
+> **CUDA 13 / torch 2.9** with sm_120 kernels enabled. RTX 50-series cards
+> require this wheel — the Ampere wheel will load but kernels will not
+> dispatch.
+>
+> No host CUDA Toolkit install is needed for the wheel itself: torch ships
+> the cu132 runtime libs inside its package, and the
+> [`qwen3.6-windows-server`](https://github.com/devnen/qwen3.6-windows-server)
+> launcher's first-run setup auto-builds a `cuda13_shim\bin\` directory with
+> `cudart64_13.dll` etc. copied out of torch's bundled libs so other DLL
+> consumers (FlashInfer JIT, Triton runtime build) can find them on PATH.
+>
+> Driver requirement is **NVIDIA 596 or newer** (CUDA 13 minimum).
+>
+> **Measured on RTX 5090 (single 32 GB card, driver 596+, vLLM 0.20.0+cu132.devnen.1):**
+> 130 tok/s short-prompt decode and ~89 tok/s on a 24 k-token prompt with
+> Qwen3.6-27B-int4-AutoRound at MTP n=6, ctx 120k. See the
+> [launcher repo](https://github.com/devnen/qwen3.6-windows-server) for
+> validated snapshot configs.
 
 ---
 
@@ -55,14 +86,18 @@ the patches survive a clean wheel install — apply them with
 
 ### Prebuilt wheel (recommended)
 
-Grab the latest `vllm-0.19.0+devnen.<n>-cp312-cp312-win_amd64.whl` from
-the [Releases](../../releases/latest) page, then:
+Grab the wheel matching your GPU from the [Releases](../../releases/latest)
+page (see the table at the top of this README), then:
 
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install <path-to-downloaded-wheel>
 ```
+
+The Ampere wheel (`+devnen.1`) installs torch 2.7+cu126. The Blackwell wheel
+(`+cu132.devnen.1`) installs torch 2.9+cu132 — pip resolves the right torch
+automatically from each wheel's metadata.
 
 The patches are baked into the wheel — no separate apply step needed.
 Verify:
@@ -120,17 +155,14 @@ CHANGES_VS_SYSTEMPANIC.md   Commit-by-commit diff vs the upstream Windows fork.
 
 ## Compatibility
 
-Wheel built against:
+| Wheel | Python | CUDA / torch | GPU arch | OS | Driver |
+|---|---|---|---|---|---|
+| `vllm-0.19.0+devnen.1`        | 3.12.x | cu126 / torch 2.7 | sm_86 (Ampere), sm_89 (Ada) — RTX 30/40 series | Windows 10 / 11 x64 | 553+ |
+| `vllm-0.20.0+cu132.devnen.1`  | 3.12.x | cu132 / torch 2.9 | sm_120 (Blackwell) — RTX 50 series | Windows 10 / 11 x64 | 596+ |
 
-- Python 3.12.x
-- CUDA 12.6
-- PyTorch 2.11.0+cu126 (matching torch nightly index URL in upstream
-  build instructions)
-- Windows 10 / 11 x64
-- NVIDIA Ampere (sm_86) or newer
-
-Nothing exotic about the build vs SystemPanic's wheel — same toolchain,
-same CUDA, same Python. Only the source diff changes.
+The Ampere wheel uses the same toolchain as SystemPanic's original Windows
+build (CUDA 12.6, MSVC 2022). The Blackwell wheel re-bases on vLLM 0.20.0
+and CUDA 13 / torch 2.9 to enable sm_120 kernels.
 
 ## Contributing
 
