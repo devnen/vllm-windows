@@ -49,6 +49,10 @@ CANDIDATE_PATCH_MAP: dict[str, Path] = {
     "vllm/reasoning/qwen3_reasoning_parser.py": PATCHES_DIR
     / "qwen3_reasoning_parser.py",
     "vllm/entrypoints/openai/models/serving.py": PATCHES_DIR / "serving_models.py",
+    # Windows-only ZMQ ipc:// -> tcp:// fallback. pyzmq has no ipc transport
+    # on Windows; without this, any multi-process executor path (PP>=2,
+    # multi-engine) crashes at boot.
+    "vllm/utils/network_utils.py": PATCHES_DIR / "network_utils.py",
 }
 
 
