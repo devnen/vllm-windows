@@ -44,6 +44,10 @@ PATCH_MAP = {
     "vllm/reasoning/qwen3_reasoning_parser.py": PATCHES_DIR
     / "qwen3_reasoning_parser.py",
     "vllm/entrypoints/openai/models/serving.py": PATCHES_DIR / "serving_models.py",
+    # Windows-only fixups for v1 multiproc executor + ZMQ ipc transport.
+    # Required for any multi-worker path (PP>=2, multi-engine) on Windows.
+    "vllm/utils/network_utils.py": PATCHES_DIR / "network_utils.py",
+    "vllm/v1/executor/multiproc_executor.py": PATCHES_DIR / "multiproc_executor.py",
 }
 
 
@@ -136,10 +140,13 @@ def main() -> int:
                 notice = (
                     "\n\n## Modified by devnen/vllm-windows\n\n"
                     "This wheel is a repackaging of the SystemPanic/vllm-windows\n"
-                    "0.19.0 wheel with three additional patches applied:\n\n"
+                    "0.19.0 wheel with the following patches applied:\n\n"
                     "1. CPU-relay for Gloo collectives (Windows has no NCCL).\n"
                     "2. Qwen3 reasoning parser fix (mirror of upstream PR #35687).\n"
-                    "3. Hardwired wildcard model name in the OpenAI server.\n\n"
+                    "3. Hardwired wildcard model name in the OpenAI server.\n"
+                    "4. ZMQ ipc:// -> tcp:// fallback on Windows (network_utils).\n"
+                    "5. Widen worker pipe isinstance check to _ConnectionBase\n"
+                    "   so PP=2 (multiproc_executor) works on Windows.\n\n"
                     "Source diff: https://github.com/devnen/vllm-windows/blob/main/CHANGES_VS_SYSTEMPANIC.md\n"
                     "License: Apache-2.0 (inherited from upstream vLLM).\n"
                 )

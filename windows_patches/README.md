@@ -127,6 +127,30 @@ Required by the canonical Qwen 3.6 agentic recipe (paired with
 `--default-chat-template-kwargs='{"preserve_thinking": false}'`).
 Source: [`allanchan339/vLLM-Qwen3.5-27B`](https://github.com/allanchan339/vLLM-Qwen3.5-27B).
 
+### `utils/network_utils.py` (Windows ZMQ ipc:// -> tcp://)
+
+`get_open_zmq_ipc_path()` originally returns `ipc://<base>/<uuid>`. pyzmq
+on Windows does not support the `ipc://` transport — only `tcp://` and
+`inproc://` work. The vLLM v1 engine wires every
+EngineCore <-> APIServer <-> Worker channel through this helper, so any
+multi-process executor path (PP=2, multi-engine, future DP=N) crashes at
+boot with `zmq.error.ZMQError: Protocol not supported (addr='ipc://...')`.
+
+Patch returns `tcp://127.0.0.1:<get_open_port()>` when `os.name == "nt"`,
+falling back to the original `ipc://` URL on POSIX. Verified 2026-05-07
+on a 2× RTX 3090 box that previously could not boot the `pp2_160k`
+snapshot.
+
+### `v1/executor/multiproc_executor.py` (worker pipe Connection check)
+
+`wait_for_ready` does `assert isinstance(pipe, Connection)` after
+`multiprocessing.connection.wait()`. On Windows, `wait()` returns
+`PipeConnection` objects, not `Connection` — the assertion fires
+immediately and the executor dies. Both subclass `_ConnectionBase`, so
+the patch widens the check to `isinstance(pipe, _ConnectionBase)` and
+adds the import. This is the second of the two errors a Windows PP=2
+boot exposes (after the `network_utils.py` ipc fix above).
+
 ### `entrypoints/openai/models/serving.py` (always-accept any model name)
 
 `OpenAIModelRegistry.is_base_model` is hardwired to return `True`,
